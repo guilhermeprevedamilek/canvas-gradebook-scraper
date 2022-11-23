@@ -19,7 +19,8 @@ export default class Puppeteer {
     // console.log("1. Starting browser");
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox"],
+      executablePath: "/usr/bin/chromium-browser" /* COMENTAR QUANDO LOCAL */,
+      args: ["--no-sandbox", "--disable-gpu"],
     });
 
     // console.log("2. Starting new page");
