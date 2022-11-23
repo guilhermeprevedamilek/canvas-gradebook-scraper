@@ -160,7 +160,8 @@ export default class Puppeteer {
     page,
     course_id,
     x_csrf_token,
-    auth_cookies
+    auth_cookies,
+    signal
   ) {
     // console.log("==== submittedAssignmentsRequest(page, course_id) ==========");
 
@@ -192,43 +193,45 @@ export default class Puppeteer {
       assignments = await handleGetAssignments(urls);
 
       for (const assignment of assignments) {
-        submissions[assignment.title] = assignment.submissions.reduce(
-          (accumulator, submission) => {
-            if (submission.submitted_at) {
-              if (submission.workflow_state === "graded") {
-                const comments = submission.submission_comments.filter(
-                  (comment) => comment.authorId !== submission.user_id
-                );
+        if (assignment.submissions != undefined) {
+          submissions[assignment.title] = assignment.submissions.reduce(
+            (accumulator, submission) => {
+              if (submission.submitted_at) {
+                if (submission.workflow_state === "graded") {
+                  const comments = submission.submission_comments.filter(
+                    (comment) => comment.authorId !== submission.user_id
+                  );
 
-                comments.forEach((comment) => {
-                  if (graded[comment.author_name]) {
-                    graded[comment.author_name]++;
-                  } else {
-                    graded[comment.author_name] = 1;
-                  }
-                });
+                  comments.forEach((comment) => {
+                    if (graded[comment.author_name]) {
+                      graded[comment.author_name]++;
+                    } else {
+                      graded[comment.author_name] = 1;
+                    }
+                  });
+                }
+
+                return [...accumulator, submission.user_id];
               }
-
-              return [...accumulator, submission.user_id];
-            }
-            return [...accumulator];
-          },
-          []
-        );
+              return [...accumulator];
+            },
+            []
+          );
+        }
       }
       // }
 
       // console.log("4. Converting informations to CSV");
       const submittedAssignmentsCsv = handleConvertSubmittedToCsv(submissions);
 
-      async function handleGetJsonLinks(sprint, signal) {
+      async function handleGetJsonLinks(/* sprint, signal */) {
         return await page.evaluate(
           async (
             canvasUrl,
             course_id,
-            sprint,
             bodyInnerHTML,
             ignoredAssignments
+            /* sprint */
           ) => {
             const jsonLinks = [];
 
@@ -282,9 +285,9 @@ export default class Puppeteer {
           },
           canvasUrl,
           course_id,
-          sprint,
           bodyInnerHTML,
           ignoredAssignments
+          /* sprint */
         );
       }
 
@@ -298,30 +301,32 @@ export default class Puppeteer {
         // });
 
         // === MODO DE BACKUP ===
-        const response = await fetch(url, {
-          headers: {
-            accept:
-              "application/json+canvas-string-ids, application/json, text/plain, */*",
-            "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "content-type": "application/json;charset=UTF-8",
-            "sec-ch-ua":
-              '".Not/A)Brand";v="99", "Google Chrome";v="103", "Chromium";v="103"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "x-csrf-token": `${x_csrf_token}`,
-            "x-requested-with": "XMLHttpRequest",
-            cookie: `log_session_id=${log_session_id}; _csrf_token=${_csrf_token}; _legacy_normandy_session=${_legacy_normandy_session}`,
-            Referer: `${canvasUrl}/courses/${course_id}/gradebook`,
-            "Referrer-Policy": "no-referrer-when-downgrade",
-          },
-          signal,
-          method: "GET",
-        });
-
-        return await response.json();
+        try {
+          return await fetch(url, {
+            headers: {
+              accept:
+                "application/json+canvas-string-ids, application/json, text/plain, */*",
+              "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+              "content-type": "application/json;charset=UTF-8",
+              "sec-ch-ua":
+                '".Not/A)Brand";v="99", "Google Chrome";v="103", "Chromium";v="103"',
+              "sec-ch-ua-mobile": "?0",
+              "sec-ch-ua-platform": '"Windows"',
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "cors",
+              "sec-fetch-site": "same-origin",
+              "x-csrf-token": `${x_csrf_token}`,
+              "x-requested-with": "XMLHttpRequest",
+              cookie: `log_session_id=${log_session_id}; _csrf_token=${_csrf_token}; _legacy_normandy_session=${_legacy_normandy_session}`,
+              Referer: `${canvasUrl}/courses/${course_id}/gradebook`,
+              "Referrer-Policy": "no-referrer-when-downgrade",
+            },
+            signal,
+            method: "GET",
+          }).then((response) => response.json());
+        } catch (error) {
+          return {};
+        }
       }
 
       async function handleGetAssignments(urls) {
@@ -334,7 +339,12 @@ export default class Puppeteer {
         // return promises;
 
         for (let url of urls) {
-          promises.push(get(url));
+          await new Promise((resolve, reject) => {
+            setTimeout(() => {
+              promises.push(get(url));
+              resolve();
+            }, 500);
+          });
         }
 
         const assignments = await Promise.all(promises);
@@ -370,6 +380,7 @@ export default class Puppeteer {
       return submittedAssignmentsCsv;
     } catch (err) {
       // console.log("> An error has occurred");
+      console.log(err);
       throw new AppError("Submitted assignments extraction failed", 400);
     }
   }

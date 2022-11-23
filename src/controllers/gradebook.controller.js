@@ -10,7 +10,7 @@ export default class GradebookController {
     const controller = new AbortController();
     const signal = controller.signal;
 
-    setTimeout(() => controller.abort(), 30000);
+    setTimeout(() => controller.abort(), 60000);
 
     try {
       const { course_id } = req.params;
