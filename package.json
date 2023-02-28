@@ -20,7 +20,7 @@
     "node-abort-controller": "^3.0.1",
     "node-fetch": "^3.2.6",
     "on-finished": "^2.4.1",
-    "puppeteer": "^15.3.2"
+    "puppeteer": "^19.7.2"
   },
   "devDependencies": {
     "cz-conventional-changelog": "3.3.0",
